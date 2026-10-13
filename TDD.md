@@ -950,8 +950,9 @@
   "a close drain behind a stalled Owner ends at the in-flight deadline and retires
   it" asserts Owner death and a bounded source lifetime; "a queued delivery to a
   stalled Writer still ends with the drain" blocks a queued reservation on a
-  suspended Writer and asserts the source still ends, since the drain has no timer
-  of its own; "memory pressure interrupts a close drain" first proves the drain is
+  suspended Writer, observes that reserve call in the Writer's mailbox, and asserts
+  the source still ends with Owner alive and transient gauges released, since the
+  drain has no timer of its own; "memory pressure interrupts a close drain" first proves the drain is
   waiting on a route lookup, then asserts prompt source death without delivery.
   Against the original socket, the first-failure guard passes (the old code also
   made one lookup before dropping everything); the stalled-Owner, shared-deadline,

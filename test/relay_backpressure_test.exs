@@ -1198,7 +1198,8 @@ defmodule PaseoRelay.BackpressureTest do
 
     # Complete the first delivery, hold the queued lookup at Owner, stall the Writer,
     # then release Owner so the queued reservation waits on the stalled Writer. The
-    # drain has no timer of its own; the reservation's deadline must end it.
+    # drain has no timer of its own; the reservation's deadline must end it while
+    # Owner stays healthy.
     :ok = :sys.suspend(destination)
     frames = [{:text, "first"}, {:text, "queued"}, {:close, 4000, "bye"}]
     :ok = :gen_tcp.send(client, Enum.map(frames, &:cow_ws.masked_frame(&1, 0x11223344)))
@@ -1210,9 +1211,19 @@ defmodule PaseoRelay.BackpressureTest do
     await_mailbox(owner, &match?({:"$gen_call", _from, {:destinations, ^source, _, _}}, &1))
     :ok = :sys.suspend(writer)
     :ok = :sys.resume(owner)
+    await_mailbox(writer, &match?({:"$gen_call", _from, {:reserve, _, _}}, &1))
 
     assert_receive {:DOWN, ^source_monitor, :process, ^source, _reason}, 1_500
+    assert Process.alive?(owner)
     assert Process.alive?(writer)
+
+    await_transient_gauges(%{
+      active_websockets: 1,
+      backpressured_sources: 0,
+      inflight_delivery_bytes: 0,
+      ingress_reserved_bytes: 0
+    })
+
     :ok = :sys.resume(writer)
     refute match?({:text, "queued"}, recv_server_frame(daemon, 500))
   end
